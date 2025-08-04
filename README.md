@@ -38,13 +38,15 @@ The following actions are key concepts of Apollo.
 
 Apollo will translate this:
 
-```Cake - The Distance
+```
+Cake - The Distance
 Spoon - The Underdog
 Deadmau5 - Some Chords
 ```
 into this:
 
-```#EXTM3U
+```
+#EXTM3U
 /music/Cake/Fashion Nugget/CAKE - The Distance.mp3
 /music/Spoon/Ga Ga Ga Ga Ga/Spoon - The Underdog.mp3
 /music/deadmau5/4x4=12/deadmau5 - Some Chords.mp3

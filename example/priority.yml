@@ -1,0 +1,37 @@
+patterns:
+  - pattern: "\\(\\d+\\)"
+    weight: -30
+    applies_to: ["url"]
+  - pattern: "live"
+    weight: -30
+    applies_to: ["title", "album"]
+  - pattern: "home demo"
+    weight: -30
+    applies_to: ["title", "album"]
+  - pattern: "accoustic"
+    weight: -30
+    applies_to: ["title", "album"]
+  - pattern: "instrumental"
+    weight: -30
+    applies_to: ["title", "album"]
+  - pattern: "best of"
+    weight: -10
+    applies_to: ["album"]
+  - pattern: "greatest"
+    weight: -10
+    applies_to: ["album"]
+  - pattern: "hits"
+    weight: -10
+    applies_to: ["album"]
+  - pattern: "remix"
+    weight: -10
+    applies_to: ["album"]
+  - pattern: "various"
+    weight: -20
+    applies_to: ["album"]
+  - pattern: "sampler"
+    weight: -10
+    applies_to: ["album"]
+  - pattern: "deluxe"
+    weight: -10
+    applies_to: ["album"]

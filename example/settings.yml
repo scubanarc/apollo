@@ -1,0 +1,22 @@
+MUSIC_FOLDER: "/path/to/music"
+
+PLAYLIST_SOURCE_FOLDER: "/path/to/source/playlists"
+PLAYLIST_PUBLISHED_FOLDER: "/path/to/mpd/playlists"
+DYNAMIC_PLAYLIST_FILE: "dynamic"
+DEFAULT_PLAYLIST_FILE: "random"
+
+OPENAI_API_KEY: "your-key"
+OPENAI_BASE_URL: "https://openrouter.ai/api/v1"
+OPENAI_MODEL: "your-favorite-model"
+
+DATABASE_UN: "dbuser"
+DATABASE_PWD: "dbpass"
+DATABASE_HOST: "dburl"
+DATABASE_NAME: "dbname"
+
+ES_URL: "http://ip_of_elasticsearch:9200"
+ES_INDEX: "apollo"
+
+SKIP_STRENGTH: 1
+VOTE_STRENGTH: 5
+RATING_THRESHOLD: 45

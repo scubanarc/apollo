@@ -1,0 +1,1 @@
+Put these files in ~/.config/apollo and edit them to match your preferences.
