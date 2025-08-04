@@ -1,0 +1,6 @@
+.venv
+dev
+.crush
+__pycache__
+notes/
+CRUSH.md
