@@ -113,16 +113,35 @@ def append_to_default_playlist(default_playlist_file: str, date_time: str, scrip
 
 def create_playlist(ptype: str, input_str: str, dynamic: bool, default_playlist_file: Optional[str], auto_yes: bool, date_time: Optional[str] = None) -> None:
     """End-to-end flow to build and optionally append a playlist."""
+    playlist_folder, apollo_folder, ai_folder, m3u_folder, missing_folder, sorted_folder = settings.get_apollo_folders()
     dt = date_time or os.popen("date +'%Y-%m-%d-%H-%M-%S'").read().strip()
     dpf = default_playlist_file or settings.get_setting('DEFAULT_PLAYLIST_FILE')
     tracks = get_tracks_by_type(ptype, input_str)
     log_playlist_creation(input_str, tracks, dt)
+
+    # before pruning, write the dynamic playlist if requested
+    if dynamic:
+        dynamic_playlist_file = settings.get_setting('DYNAMIC_PLAYLIST_FILE')
+
+
+        dynamic_path = os.path.join(playlist_folder, f"{dynamic_playlist_file}.txt")
+        print(Fore.YELLOW + f"Writing dynamic playlist to {dynamic_path}")
+        with open(dynamic_path, "w") as f:
+            for line in tracks:
+                f.write(line + "\n")
+    
+        write_m3u_files(single_file=dynamic_playlist_file + ".txt")
+        return
+    
+    # normal playlist creation
     existing, tracks = diff_against_default(tracks, dpf)
     print_summary(ptype, input_str, existing, tracks)
+
     if len(tracks) == 0:
         print(Fore.RED + "No new tracks found.")
         print(Style.RESET_ALL)
         return
+    
     write_to_default_playlist = auto_yes
     if not auto_yes:
         print(f"Do you want to add this to the '{dpf}' playlist? " + Fore.YELLOW + "(y/N): ")
@@ -130,11 +149,14 @@ def create_playlist(ptype: str, input_str: str, dynamic: bool, default_playlist_
         key = _getch.getch()
         if key == 'y':
             write_to_default_playlist = True
+    
     if write_to_default_playlist:
         script_name = os.path.basename(__file__)
         append_to_default_playlist(dpf, dt, script_name, input_str, tracks)
     else:
         print(f"Not adding to {dpf} playlist")
+    
+
     print(Style.RESET_ALL)
 
 
