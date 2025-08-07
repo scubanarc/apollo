@@ -24,7 +24,7 @@ Apollo was designed with music player daemons like `mpd` in mind, but it can be 
 
 When you manage a large collection of music files, it can be difficult to rename files without breaking playlists. Tools like Strawberry & MediaMonkey use a database to maintain a link between playlist entries and files. This makes renaming and moving files a fragile process, as playlists can break if files are renamed or moved.
 
-With Apollo, you maintain lists of **songs** you like, as opposed to lists of **files** you like. Apollo uses Elasticsearch to match songs on the list to files in your collection, creatting an M3U playlist from a list of songs. This allows you to rename and move music files without breaking playlists, as the playlists are based on song title rather than file paths.
+With Apollo, you maintain lists of **songs** you like, as opposed to lists of **files** you like. Apollo uses Elasticsearch to match songs on the list to files in your collection, creating an M3U playlist from a list of songs. This allows you to rename and move music files without breaking playlists, as the playlists are based on song title rather than file paths.
 
 In the Apollo system, all songs are referenced as "artist - title" pairs. Album is not considered, as Apollo is designed to work with individual songs rather than albums. This means that you can create playlists based on your favorite songs without worrying about the album they belong to.
 
