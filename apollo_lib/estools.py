@@ -255,4 +255,28 @@ def get_all_by_artist(es, index_name, artist):
     lines = list(set(lines))
     return lines
 
+def get_all_by_path(es, index_name, path):
+    """Get all songs in a specific path from Elasticsearch."""
+    query_body = {
+        "query": {
+            "bool": {
+                "must": [
+                    {"match_phrase_prefix": {"url": path}},
+                ],
+                "should": [
+                    {"range": {"bitrate": {"gte": 320}}},
+                    {"range": {"samplerate": {"gte": 48000}}}
+                ],
+            },
+        },
+        "size": 500,
+    }
 
+    result = es.search(index=index_name, body=query_body)
+
+    lines = []
+    for hit in result["hits"]["hits"]:
+        lines.append(f"{hit['_source']['artist']} - {hit['_source']['title']}")
+
+    lines = list(set(lines))
+    return lines

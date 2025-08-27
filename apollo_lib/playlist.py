@@ -25,6 +25,11 @@ def get_tracks_by_type(ptype: str, input_str: str) -> List[str]:
         es, index_name = estools.get_es()
         tracks = estools.get_all_by_artist(es, index_name, input_str)
         return sorted(list(set(tracks)))
+    
+    if ptype == "path":
+        es, index_name = estools.get_es()
+        tracks = estools.get_all_by_path(es, index_name, input_str)
+        return sorted(list(set(tracks)))
 
     if ptype == "any":
         pattern = re.compile(input_str, re.IGNORECASE)

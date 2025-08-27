@@ -8,7 +8,7 @@ def main():
     subparsers = parser.add_subparsers(dest="command", required=True)
     # create subparser for create-playlist
     create_parser = subparsers.add_parser("create", help="Create a playlist")
-    create_parser.add_argument("-t", "--type", required=True, choices=["ai", "artist", "any"], help="Type of playlist to create")
+    create_parser.add_argument("-t", "--type", required=True, choices=["ai", "artist", "path", "any"], help="Type of playlist to create")
     create_parser.add_argument("-i", "--input", required=True, help="Input string for the playlist type")
     create_parser.add_argument("-d", "--dynamic", action="store_true", help="Write dynamic M3U to DYNAMIC_PLAYLIST_FILE")
     create_parser.add_argument("-p", "--playlist", help="Override DEFAULT_PLAYLIST_FILE for appending new tracks")
