@@ -96,12 +96,15 @@ def print_summary(ptype: str, input_str: str, existing: List[str], new_tracks: L
         print(Fore.YELLOW + f"Search: {input_str}")
     for line in existing + new_tracks:
         pass
-    print(Fore.CYAN + "\nExisting tracks:")
+    print(Fore.CYAN + f"\nExisting tracks ({len(existing)}):")
     for line in existing:
         print(f"{line}")
-    print(Fore.GREEN + "\nNew tracks:")
+    print(Fore.GREEN + f"\nNew tracks ({len(new_tracks)}):")
     for line in new_tracks:
         print(f"{line}")
+
+    print(Fore.YELLOW + f"\nExisting tracks: {len(existing)}")
+    print(Fore.YELLOW + f"New tracks:      {len(new_tracks)}")
     print(Style.RESET_ALL)
 
 
@@ -149,7 +152,11 @@ def create_playlist(ptype: str, input_str: str, dynamic: bool, default_playlist_
     
     write_to_default_playlist = auto_yes
     if not auto_yes:
-        print(f"Do you want to add this to the '{dpf}' playlist? " + Fore.YELLOW + "(y/N): ")
+        plural = "tracks"
+        if len(tracks) == 1:
+            plural = "track"
+
+        print(f"Do you want to add {len(tracks)} new {plural} to the '{dpf}' playlist? " + Fore.YELLOW + "(y/N): ")
         import getch as _getch
         key = _getch.getch()
         if key == 'y':
