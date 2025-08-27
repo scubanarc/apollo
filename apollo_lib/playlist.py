@@ -106,7 +106,7 @@ def append_to_default_playlist(default_playlist_file: str, date_time: str, scrip
     print(f"Adding to {default_playlist_file} playlist")
     with open(os.path.join(playlist_folder, f"{default_playlist_file}.txt"), "a") as f:
         f.write("\n# Added at " + date_time)
-        f.write(f"\n# {script_name} \"{input_str}\"\n")
+        f.write(f"\n# apollo.py - \"{input_str}\"\n")
         for line in tracks:
             f.write(line + "\n")
 

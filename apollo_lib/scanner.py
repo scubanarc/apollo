@@ -1,4 +1,8 @@
-import eyed3
+from mutagen import File as MutagenFile
+from mutagen.mp3 import MP3
+from mutagen.flac import FLAC
+from mutagen.oggvorbis import OggVorbis
+from mutagen.mp4 import MP4
 import os
 from colorama import Fore, Style
 from elasticsearch import Elasticsearch, helpers
@@ -25,11 +29,29 @@ def remove_emojis(string):
     
     return emoji_pattern.sub(r'', string)
 
+def get_tag_value(audiofile, tag_keys):
+    """Get tag value using multiple possible keys for different formats."""
+    for key in tag_keys:
+        try:
+            if key in audiofile.tags:
+                value = audiofile.tags[key]
+                if isinstance(value, list) and value:
+                    return str(value[0])
+                elif value:
+                    return str(value)
+        except (KeyError, AttributeError, TypeError):
+            continue
+    return None
+
 def scan_music_folder_into_es():
-    """Scan MUSIC_FOLDER and upsert MP3 metadata into Elasticsearch."""
+    """Scan MUSIC_FOLDER and upsert audio file metadata into Elasticsearch."""
     input_directory = settings.get_setting("MUSIC_FOLDER")
     es_index = settings.get_setting("ES_INDEX")
     scanned_files = set()
+    
+    # Get supported audio file extensions from settings
+    supported_extensions_list = settings.get_setting("SUPPORTED_EXTENSIONS")
+    supported_extensions = tuple(ext.lower() for ext in supported_extensions_list)
 
     # turn off buffering
     os.environ['PYTHONUNBUFFERED'] = "1"
@@ -48,111 +70,146 @@ def scan_music_folder_into_es():
 
     doc = None
     try:
-        # us os.walk to get all the mp3 files
+        # us os.walk to get all the audio files
         for root, _, files in os.walk(input_directory):
 
             for file in files:
-                if file.lower().endswith(".mp3"):
+                if file.lower().endswith(supported_extensions):
                     count += 1
-                    mp3_file = os.path.join(root, file)
-                    scanned_files.add(mp3_file)
+                    music_file = os.path.join(root, file)
+                    scanned_files.add(music_file)
                     print(f"\rProcessed {count} files...", end="", flush=True)
 
-                    # Load the MP3 file
-                    # tell eyeD3 to ignore unknown tags
-                    eyed3.log.setLevel("ERROR")
-                    
                     # before we load the file, let's get the file size and modification time
-                    size = os.path.getsize(mp3_file)
-                    modification_time = os.path.getmtime(mp3_file)
+                    size = os.path.getsize(music_file)
+                    modification_time = os.path.getmtime(music_file)
 
                     # now let's get the file from es, do not error if not found
-                    doc = es.options(ignore_status=404).get(index=es_index, id=mp3_file)
+                    doc = es.options(ignore_status=404).get(index=es_index, id=music_file)
 
 
                     # if the document exists, let's check the modification time
                     if doc["found"]:
                         if doc["_source"]["modification_time"] == modification_time:
-                            #print(f"Skipping {mp3_file} - no changes")
+                            #print(f"Skipping {music_file} - no changes")
                             continue
                     
-                    print(Fore.RED + "New file: ", mp3_file)
+                    print(Fore.RED + "New file: ", music_file)
 
                     # print("DEBUG - not skipping - test this upsert")
                     # quit()
 
-                    audiofile = eyed3.load(mp3_file)
+                    # Load the audio file using mutagen
+                    try:
+                        audiofile = MutagenFile(music_file)
+                        if not audiofile:
+                            print(f"Warning: Could not load {music_file}")
+                            continue
+                    except Exception as e:
+                        print(f"Error loading {music_file}: {e}")
+                        continue
 
-                    # Get the tags
-                    if audiofile and audiofile.tag:
-                        title = audiofile.tag.title
-                        album = audiofile.tag.album
-                        albumartist = audiofile.tag.album_artist
-                        artist = audiofile.tag.artist
-                        year = audiofile.tag.getBestDate()
+                    # Get the tags using mutagen's generic interface
+                    title = None
+                    album = None
+                    albumartist = None
+                    artist = None
+                    year = 0
+                    genre = None
+                    duration = 0
+                    bitrate = 0
+                    samplerate = 0
+                    vbr = False
 
-                        if year:
-                            year = year.year
-                        else:
-                            year = 0
-                            
-                        genre = audiofile.tag.genre
-                        if genre:
-                            genre = genre.name
-
-                        # duration
-                        duration = audiofile.info.time_secs
-
-                        url = mp3_file
-                        #bitrate_str = str(audiofile.info.bit_rate_str)
-                        # bitrate returns a tuple, we only want the second element
-                        bitrate = audiofile.info.bit_rate[1]
-                        vbr = audiofile.info.bit_rate[0]
-
-                        samplerate = str(audiofile.info.sample_freq)
-
-                        if bitrate == 0:
-                            # calc kbps from duration and filesize
-                            bitrate = round((size * 8/ 1024) / duration, 0)
-
-                        print(Fore.WHITE + f"  Title:        {title}")
-                        print(f"  Album:        {album}")
-                        print(f"  Album Artist: {albumartist}")
-                        print(f"  Artist:       {artist}")
-                        print(f"  Year:         {year}")
-                        print(f"  Genre:        {genre}")
-                        print(f"  URL:          {url}")
-                        print(f"  Samplerate:   {samplerate}")
-                        print(f"  Duration:     {duration}")
-                        print(f"  Size:         {size}")
-                        print(f"  Mod Time:     {modification_time}")
-                        print(f"  VBR:          {vbr}")
-                        print(Fore.YELLOW + f"  Bitrate:      {bitrate}")
-                        print(Style.RESET_ALL)
+                    # Extract metadata
+                    if hasattr(audiofile, 'tags') and audiofile.tags:
+                        # Common tag mappings for different formats
+                        title = get_tag_value(audiofile, ['TIT2', 'TITLE', '\xa9nam'])
+                        album = get_tag_value(audiofile, ['TALB', 'ALBUM', '\xa9alb'])
+                        artist = get_tag_value(audiofile, ['TPE1', 'ARTIST', '\xa9ART'])
+                        albumartist = get_tag_value(audiofile, ['TPE2', 'ALBUMARTIST', 'aART'])
                         
-                        # create json string to insert into Elasticsearch using upsert
-                        update_body = {
-                            "doc": {
-                                "title": title,
-                                "album": album,
-                                "albumartist": albumartist,
-                                "artist": artist,
-                                "year": year,
-                                "genre": genre,
-                                "url": url,
-                                "bitrate": bitrate,
-                                "samplerate": samplerate,
-                                "duration": duration,
-                                "size": size,
-                                "modification_time": modification_time,
-                                "vbr": vbr
-                            },
-                            "doc_as_upsert": True
-                        }
+                        # Year/Date handling
+                        year_str = get_tag_value(audiofile, ['TDRC', 'DATE', '\xa9day', 'YEAR'])
+                        if year_str:
+                            try:
+                                # Extract year from various date formats
+                                year_match = re.search(r'(\d{4})', str(year_str))
+                                if year_match:
+                                    year = int(year_match.group(1))
+                            except (ValueError, AttributeError):
+                                year = 0
+                        
+                        genre = get_tag_value(audiofile, ['TCON', 'GENRE', '\xa9gen'])
 
-                        # insert the document into Elasticsearch using upsert and file path as the ID
-                        es.update(index=es_index, id=url, body=update_body)
-                        new_songs += 1
+                    # Get audio info
+                    if hasattr(audiofile, 'info') and audiofile.info:
+                        duration = getattr(audiofile.info, 'length', 0)
+                        
+                        # Bitrate handling varies by format
+                        if hasattr(audiofile.info, 'bitrate'):
+                            bitrate = audiofile.info.bitrate
+                        elif hasattr(audiofile.info, 'bitrate_nominal'):
+                            bitrate = audiofile.info.bitrate_nominal
+                        
+                        # VBR detection
+                        if hasattr(audiofile.info, 'bitrate_mode'):
+                            vbr = audiofile.info.bitrate_mode != 0  # 0 is CBR
+                        
+                        # Sample rate
+                        if hasattr(audiofile.info, 'sample_rate'):
+                            samplerate = str(audiofile.info.sample_rate)
+                        elif hasattr(audiofile.info, 'samplerate'):
+                            samplerate = str(audiofile.info.samplerate)
+
+                    url = music_file
+                    # Extract file extension
+                    extension = os.path.splitext(music_file)[1].lower()
+
+                    if bitrate == 0 and duration > 0:
+                        # calc kbps from duration and filesize
+                        bitrate = round((size * 8/ 1024) / duration, 0)
+
+                    print(Fore.WHITE + f"  Title:        {title}")
+                    print(f"  Album:        {album}")
+                    print(f"  Album Artist: {albumartist}")
+                    print(f"  Artist:       {artist}")
+                    print(f"  Year:         {year}")
+                    print(f"  Genre:        {genre}")
+                    print(f"  URL:          {url}")
+                    print(f"  Samplerate:   {samplerate}")
+                    print(f"  Duration:     {duration}")
+                    print(f"  Size:         {size}")
+                    print(f"  Mod Time:     {modification_time}")
+                    print(f"  VBR:          {vbr}")
+                    print(f"  Extension:    {extension}")
+                    print(Fore.YELLOW + f"  Bitrate:      {bitrate}")
+                    print(Style.RESET_ALL)
+                    
+                    # create json string to insert into Elasticsearch using upsert
+                    update_body = {
+                        "doc": {
+                            "title": title,
+                            "album": album,
+                            "albumartist": albumartist,
+                            "artist": artist,
+                            "year": year,
+                            "genre": genre,
+                            "url": url,
+                            "bitrate": bitrate,
+                            "samplerate": samplerate,
+                            "duration": duration,
+                            "size": size,
+                            "modification_time": modification_time,
+                            "vbr": vbr,
+                            "extension": extension
+                        },
+                        "doc_as_upsert": True
+                    }
+
+                    # insert the document into Elasticsearch using upsert and file path as the ID
+                    es.update(index=es_index, id=url, body=update_body)
+                    new_songs += 1
                     
     
         
@@ -182,11 +239,11 @@ def prune_missing_files_from_es(input_directory, scanned_files, es, es_index):
 
     for hit in scan(es, index=es_index, query={"query": {"match_all": {}}}):
         count += 1
-        mp3_file = hit["_id"]
-        if scanned_files and mp3_file not in scanned_files:
-            print(Fore.RED + f"Missing {mp3_file}")
-            es.delete(index=es_index, id=mp3_file)
-            print(Fore.GREEN + f"Deleted {mp3_file}" + Style.RESET_ALL)
+        music_file = hit["_id"]
+        if scanned_files and music_file not in scanned_files:
+            print(Fore.RED + f"Missing {music_file}")
+            es.delete(index=es_index, id=music_file)
+            print(Fore.GREEN + f"Deleted {music_file}" + Style.RESET_ALL)
             missing += 1
 
         else:
@@ -201,6 +258,7 @@ def prune_missing_files_from_es(input_directory, scanned_files, es, es_index):
             song["year"] = hit["_source"]["year"]
             song["genre"] = hit["_source"]["genre"]
             song["url"] = hit["_source"]["url"]
+            song["extension"] = hit["_source"].get("extension", "")
             
             if(song["artist"]):
                 song["artist"] = song["artist"].replace("\"", "'")

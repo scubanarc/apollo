@@ -47,8 +47,8 @@ into this:
 
 ```
 #EXTM3U
-/music/Cake/Fashion Nugget/CAKE - The Distance.mp3
-/music/Spoon/Ga Ga Ga Ga Ga/Spoon - The Underdog.mp3
+/music/Cake/Fashion Nugget/CAKE - The Distance.ogg
+/music/Spoon/Ga Ga Ga Ga Ga/Spoon - The Underdog.flac
 /music/deadmau5/4x4=12/deadmau5 - Some Chords.mp3
 ```
 Notice how the playlist is based on the song title and artist, not the file path. This means you can rename or move files without breaking the playlist. Also note that case and small misspellings are handled by Elasticsearch, so you don't have to worry about getting the exact file path right.

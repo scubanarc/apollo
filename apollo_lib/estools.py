@@ -34,6 +34,7 @@ def print_hit(hit):
     print(f"  Size: {src.get('size', '')}")
     print(f"  Mod Time: {src.get('modification_time', '')}")
     print(f"  VBR: {src.get('vbr', '')}")
+    print(f"  Extension: {src.get('extension', '')}")
     print(f"  Match score: {hit.get('_score', '')}")
 
     if 'priority' in hit:
@@ -42,6 +43,29 @@ def print_hit(hit):
         print(f"  Patterns: {hit.get('patterns', [])}")
 
     print(Style.RESET_ALL)
+
+def get_normalized_bitrate(hit_source):
+    """Calculate normalized bitrate based on format-specific multipliers."""
+    bitrate = hit_source.get("bitrate", 0)
+    extension = hit_source.get("extension", "").lower()
+    
+    # Get bitrate multipliers from settings
+    try:
+        multipliers = settings.get_setting("BITRATE_MULTIPLIERS")
+        multiplier = multipliers.get(extension, 1.0)
+        return bitrate * multiplier
+    except:
+        # Fallback to default multipliers if setting not found
+        default_multipliers = {
+            ".mp3": 1.0,
+            ".ogg": 1.3,
+            ".m4a": 1.2,
+            ".aac": 1.2,
+            ".mp4": 1.2,
+            ".flac": 1.0
+        }
+        multiplier = default_multipliers.get(extension, 1.0)
+        return bitrate * multiplier
 
 def load_patterns(file_path):
     """Load patterns from a YAML file."""
@@ -82,22 +106,59 @@ def pick_best_hit(result, patterns_path=None):
                 "patterns": matched_patterns,
             })
 
-    max_bitrate = 0
-    best = None
+    # First, separate FLAC files from others
+    flac_candidates = []
+    other_candidates = []
+    
     for c in candidates:
-        bitrate = c["hit"]["_source"].get("bitrate", 0)
-        if bitrate >= max_bitrate:
-            inner_debug_string += "New bitrate test...\n"
-            if bitrate == max_bitrate:
-                if best is None or c["priority"] > best["priority"]:
-                    inner_debug_string += f"New priority: {c['priority']} > {best['priority'] if best else 'None'}\n"
+        extension = c["hit"]["_source"].get("extension", "").lower()
+        if extension == ".flac":
+            flac_candidates.append(c)
+        else:
+            other_candidates.append(c)
+    
+    inner_debug_string += f"FLAC candidates: {len(flac_candidates)}, Other candidates: {len(other_candidates)}\n"
+    
+    best = None
+    
+    # If we have FLAC candidates, prioritize them
+    if flac_candidates:
+        inner_debug_string += "Using FLAC priority logic\n"
+        max_bitrate = 0
+        for c in flac_candidates:
+            bitrate = c["hit"]["_source"].get("bitrate", 0)
+            if bitrate >= max_bitrate:
+                if bitrate == max_bitrate:
+                    if best is None or c["priority"] > best["priority"]:
+                        inner_debug_string += f"FLAC priority: {c['priority']} > {best['priority'] if best else 'None'}\n"
+                        best = c
+                else:
+                    inner_debug_string += f"New FLAC max bitrate: {bitrate} > {max_bitrate}\n"
+                    max_bitrate = bitrate
                     best = c
-            else:
-                inner_debug_string += f"New max bitrate: {bitrate} > {max_bitrate}\n"
-                max_bitrate = bitrate
-                best = c
-
-    inner_debug_string += f"Max bitrate: {max_bitrate}"
+        inner_debug_string += f"Selected FLAC with bitrate: {max_bitrate}\n"
+    else:
+        # No FLAC files, use normalized bitrate comparison
+        inner_debug_string += "Using normalized bitrate comparison\n"
+        max_normalized_bitrate = 0
+        for c in other_candidates:
+            hit_source = c["hit"]["_source"]
+            normalized_bitrate = get_normalized_bitrate(hit_source)
+            extension = hit_source.get("extension", "")
+            actual_bitrate = hit_source.get("bitrate", 0)
+            
+            inner_debug_string += f"File {extension}: actual={actual_bitrate}, normalized={normalized_bitrate:.1f}\n"
+            
+            if normalized_bitrate >= max_normalized_bitrate:
+                if normalized_bitrate == max_normalized_bitrate:
+                    if best is None or c["priority"] > best["priority"]:
+                        inner_debug_string += f"Normalized priority: {c['priority']} > {best['priority'] if best else 'None'}\n"
+                        best = c
+                else:
+                    inner_debug_string += f"New max normalized bitrate: {normalized_bitrate:.1f} > {max_normalized_bitrate:.1f}\n"
+                    max_normalized_bitrate = normalized_bitrate
+                    best = c
+        inner_debug_string += f"Selected with normalized bitrate: {max_normalized_bitrate:.1f}\n"
     return best, candidates, inner_debug_string
 
 def get_playlist_from_lines(es, index_name, lines):
