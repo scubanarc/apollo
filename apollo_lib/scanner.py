@@ -11,6 +11,7 @@ from elasticsearch.helpers import scan
 import unicodedata
 import re
 import json
+import subprocess
 from apollo_lib import estools
 from apollo_lib import settings
 
@@ -44,8 +45,24 @@ def get_tag_value(audiofile, tag_keys):
             continue
     return None
 
+def ffprobe_bitrate(file_path):
+    cmd = [
+        "ffprobe",
+        "-v", "error",
+        "-show_entries", "format=duration,bit_rate",
+        "-of", "json",
+        file_path
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    info = json.loads(result.stdout)
+    duration = float(info["format"]["duration"])
+    bitrate = int(info["format"]["bit_rate"])
+    return duration, bitrate
+
 def scan_music_folder_into_es():
     """Scan MUSIC_FOLDER and upsert audio file metadata into Elasticsearch."""
+    playlist_folder,apollo_folder, ai_folder, m3u_folder, missing_folder, sorted_folder = settings.get_apollo_folders()
+
     input_directory = settings.get_setting("MUSIC_FOLDER")
     es_index = settings.get_setting("ES_INDEX")
     scanned_files = set()
@@ -66,6 +83,24 @@ def scan_music_folder_into_es():
     except Exception:
         print(Fore.CYAN + "ES count unavailable" + Style.RESET_ALL)
     
+    # look for file in es.jsonl to get previous data
+    # example line:
+    # {"artist": "10,000 Maniacs", "title": "Eat for Two", "album": "MTV Unplugged", "albumartist": "10,000 Maniacs", "year": 1993, "genre": "Rock", "url": "/mnt/user/music/10,000 Maniacs/MTV Unplugged/02 - Eat for Two.mp3", "extension": ".mp3", "bitrate": 219460, "samplerate": "44100", "duration": 262.58285714285716, "size": 7205493, "vbr": true, "modification_time": 1680708016.01, "id": "/mnt/user/music/10,000 Maniacs/MTV Unplugged/02 - Eat for Two.mp3"}
+    input_lines = []
+    dictionary_of_existing_files = {}
+    es_jsonl_path = os.path.join(ai_folder, "es.jsonl")
+    if os.path.exists(es_jsonl_path):
+        with open(es_jsonl_path, "r") as f:
+            input_lines = f.readlines()
+        
+        for line in input_lines:
+            try:
+                song = json.loads(line)
+                if "url" in song:
+                    dictionary_of_existing_files[song["url"]] = song
+            except json.JSONDecodeError:
+                continue
+
     count = 0
     new_songs = 0
 
@@ -85,14 +120,17 @@ def scan_music_folder_into_es():
                     file_size = os.path.getsize(music_file)
                     modification_time = os.path.getmtime(music_file)
 
-                    # now let's get the file from es, do not error if not found
-                    doc = es.options(ignore_status=404).get(index=es_index, id=music_file)
-
-
-                    # if the document exists, let's check the modification time
-                    if doc["found"]:
-                        if doc["_source"]["modification_time"] == modification_time:
-                            #print(f"Skipping {music_file} - no changes")
+                    # test file vs dictionary
+                    if(music_file in dictionary_of_existing_files):
+                        existing_entry = dictionary_of_existing_files[music_file]
+                        
+                        # look for 32000
+                        if(existing_entry.get("bitrate") == 32000):
+                            print(Fore.RED + f"\nFile previously detected as 32kbps, re-evaluating: {music_file}" + Style.RESET_ALL)
+                        
+                        elif (existing_entry.get("size") == file_size and 
+                            existing_entry.get("modification_time") == modification_time):
+                            # print(f"Skipping {music_file} - no changes")
                             continue
                     
                     print(Fore.GREEN + "New file: ", music_file, Style.RESET_ALL)
@@ -183,6 +221,12 @@ def scan_music_folder_into_es():
                             # average bitrate in kbps
                             avg_bitrate = (audio_size * 8) / duration
                             bitrate = round(avg_bitrate / 1000) * 1000
+
+                            # if it is sill 32000, then fall back to ffmpeg
+                            if bitrate == 32000:
+                                print(f"{Fore.RED}Bitrate still 32000 after calculation, consider using ffmpeg for more accurate analysis.{Style.RESET_ALL}")
+                                duration, bitrate = ffprobe_bitrate(music_file)
+                                print(f"{Fore.RED}FFprobe duration: {duration}, bitrate: {bitrate}{Style.RESET_ALL}")
 
                     print(Fore.WHITE + f"  Title:        {title}")
                     print(f"  Album:        {album}")
