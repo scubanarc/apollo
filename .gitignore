@@ -6,3 +6,5 @@ notes/
 CRUSH.md
 QWEN.md
 CLAUDE.md
+*.egg-info
+build/

@@ -1,5 +1,6 @@
 from mutagen import File as MutagenFile
 from mutagen.mp3 import MP3
+from mutagen.id3 import ID3, ID3NoHeaderError
 from mutagen.flac import FLAC
 from mutagen.oggvorbis import OggVorbis
 from mutagen.mp4 import MP4
@@ -81,7 +82,7 @@ def scan_music_folder_into_es():
                     print(f"\rProcessed {count} files...", end="", flush=True)
 
                     # before we load the file, let's get the file size and modification time
-                    size = os.path.getsize(music_file)
+                    file_size = os.path.getsize(music_file)
                     modification_time = os.path.getmtime(music_file)
 
                     # now let's get the file from es, do not error if not found
@@ -94,10 +95,7 @@ def scan_music_folder_into_es():
                             #print(f"Skipping {music_file} - no changes")
                             continue
                     
-                    print(Fore.RED + "New file: ", music_file)
-
-                    # print("DEBUG - not skipping - test this upsert")
-                    # quit()
+                    print(Fore.GREEN + "New file: ", music_file, Style.RESET_ALL)
 
                     # Load the audio file using mutagen
                     try:
@@ -166,9 +164,25 @@ def scan_music_folder_into_es():
                     # Extract file extension
                     extension = os.path.splitext(music_file)[1].lower()
 
-                    if bitrate == 0 and duration > 0:
-                        # calc kbps from duration and filesize
-                        bitrate = round((size * 8/ 1024) / duration, 0)
+                    if bitrate == 0 and duration > 0 or bitrate == 32000:
+                        # make sure it's an MP3 file
+                        if isinstance(audiofile, MP3):
+                            # subtract ID3v2 tag size if present
+                            try:
+                                id3 = audiofile.tags
+                                id3v2_size = id3.size  # bytes
+                            except ID3NoHeaderError:
+                                id3v2_size = 0
+
+                            # subtract ID3v1 tag size if present (always 128 bytes at end)
+                            id3v1_size = 128 if audiofile.tags and audiofile.tags.version == (1, 0) else 0
+
+                            # calculate audio-only size
+                            audio_size = file_size - id3v2_size - id3v1_size
+
+                            # average bitrate in kbps
+                            avg_bitrate = (audio_size * 8) / duration
+                            bitrate = round(avg_bitrate / 1000) * 1000
 
                     print(Fore.WHITE + f"  Title:        {title}")
                     print(f"  Album:        {album}")
@@ -179,12 +193,11 @@ def scan_music_folder_into_es():
                     print(f"  URL:          {url}")
                     print(f"  Samplerate:   {samplerate}")
                     print(f"  Duration:     {duration}")
-                    print(f"  Size:         {size}")
+                    print(f"  Size:         {file_size}")
                     print(f"  Mod Time:     {modification_time}")
                     print(f"  VBR:          {vbr}")
                     print(f"  Extension:    {extension}")
-                    print(Fore.YELLOW + f"  Bitrate:      {bitrate}")
-                    print(Style.RESET_ALL)
+                    print(f"  Bitrate:      {bitrate}")
                     
                     # create json string to insert into Elasticsearch using upsert
                     update_body = {
@@ -199,7 +212,7 @@ def scan_music_folder_into_es():
                             "bitrate": bitrate,
                             "samplerate": samplerate,
                             "duration": duration,
-                            "size": size,
+                            "size": file_size,
                             "modification_time": modification_time,
                             "vbr": vbr,
                             "extension": extension
@@ -259,36 +272,17 @@ def prune_missing_files_from_es(input_directory, scanned_files, es, es_index):
             song["genre"] = hit["_source"]["genre"]
             song["url"] = hit["_source"]["url"]
             song["extension"] = hit["_source"].get("extension", "")
-            
-            if(song["artist"]):
-                song["artist"] = song["artist"].replace("\"", "'")
+            song["bitrate"] = hit["_source"]["bitrate"]
+            song["samplerate"] = hit["_source"]["samplerate"]
+            song["duration"] = hit["_source"]["duration"]
+            song["size"] = hit["_source"]["size"]
+            song["vbr"] = hit["_source"]["vbr"]
+            song["modification_time"] = hit["_source"]["modification_time"]
+            song["id"] = hit["_id"]
 
-            if(song["title"]):
-                song["title"] = song["title"].replace("\"", "'")
-
-            if(song["album"]):
-                song["album"] = song["album"].replace("\"", "'")
-
-            if(song["albumartist"]):
-                song["albumartist"] = song["albumartist"].replace("\"", "'")
-
-            if(song["genre"]):
-                song["genre"] = song["genre"].replace("\"", "'")
-
-            if(song["url"]):
-                song["url"] = song["url"].replace("\"", "'")
+            # json.dumps() already handles proper escaping, no manual escaping needed
                 
-            line = json.dumps(song) + "\n"
-            line = remove_emojis(line)
-            line = line.encode('utf-16','surrogatepass').decode('utf-16')
-            line = line.encode('utf-8').decode('unicode-escape')
-            line = unicodedata.normalize('NFKD', line).encode('ascii', 'ignore').decode('utf-8')
-
-            # replace \x0 with a space
-            line = line.replace("\x00", " ")
-
-            # replace \ with escaped \
-            line = line.replace("\\", "\\\\")
+            line = json.dumps(song, ensure_ascii=False) + "\n"
 
             output += line
             found += 1

@@ -228,6 +228,10 @@ def write_m3u_files(single_file: str | None = None):
         if file.endswith(".txt"):
             print(Fore.GREEN + f"Reading {file}")
 
+            # Skip .apollo directory files
+            if file.startswith(".apollo"):
+                continue
+
             with open(os.path.join(sorted_folder, file), "r") as f:
                 duration = 0
                 lines = f.readlines()

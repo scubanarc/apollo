@@ -44,10 +44,9 @@ def print_hit(hit):
 
     print(Style.RESET_ALL)
 
-def get_normalized_bitrate(hit_source):
+def get_normalized_bitrate(bitrate, extension):
     """Calculate normalized bitrate based on format-specific multipliers."""
-    bitrate = hit_source.get("bitrate", 0)
-    extension = hit_source.get("extension", "").lower()
+    extension = extension.lower()
     
     # Get bitrate multipliers from settings
     try:
@@ -143,11 +142,11 @@ def pick_best_hit(result, patterns_path=None):
         max_normalized_bitrate = 0
         for c in other_candidates:
             hit_source = c["hit"]["_source"]
-            normalized_bitrate = get_normalized_bitrate(hit_source)
+            bitrate = hit_source.get("bitrate", 0)
             extension = hit_source.get("extension", "")
-            actual_bitrate = hit_source.get("bitrate", 0)
+            normalized_bitrate = get_normalized_bitrate(bitrate, extension)
             
-            inner_debug_string += f"File {extension}: actual={actual_bitrate}, normalized={normalized_bitrate:.1f}\n"
+            inner_debug_string += f"File {extension}: actual={bitrate}, normalized={normalized_bitrate:.1f}\n"
             
             if normalized_bitrate >= max_normalized_bitrate:
                 if normalized_bitrate == max_normalized_bitrate:
