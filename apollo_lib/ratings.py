@@ -186,6 +186,129 @@ def calculate_all_ratings(verbose=False):
     global calculated_ratings
     calculated_ratings = merged
 
+def calculate_all_artists_ratings():
+    """
+    Calculate and return all artists with their ratings, sorted from highest to lowest.
+    Uses data from calculate_all_ratings() function.
+    """
+    global calculated_ratings
+    if calculated_ratings is None:
+        calculate_all_ratings(verbose=False)
+    
+    if calculated_ratings is None:
+        return []
+    
+    # Aggregate ratings by artist
+    artist_ratings = {}
+    for key, data in calculated_ratings.items():
+        artist = key[0]  # artist is the first element of the tuple key
+        calculated_rating = data.get('calculated_rating', 0)
+        
+        if artist not in artist_ratings:
+            artist_ratings[artist] = {
+                'artist': artist,
+                'total_rating': 0,
+                'song_count': 0,
+                'average_rating': 0
+            }
+        
+        artist_ratings[artist]['total_rating'] += calculated_rating
+        artist_ratings[artist]['song_count'] += 1
+    
+    # Calculate average rating for each artist
+    for artist_data in artist_ratings.values():
+        if artist_data['song_count'] > 0:
+            artist_data['average_rating'] = artist_data['total_rating'] / artist_data['song_count']
+    
+    # Convert to list and sort by average rating (highest first)
+    sorted_artists = sorted(artist_ratings.values(), key=lambda x: x['average_rating'], reverse=True)
+    
+    return sorted_artists
+
+def calculate_artist_rating(artist):
+    """
+    Calculate the rating for a given artist across all their songs.
+    This function connects to the database, retrieves all songs by the artist,
+    and calculates the average rating based on the formula.
+    """
+    dbh, sth = get_db_connection()
+    
+    # Get all songs by this artist
+    sth.execute("SELECT DISTINCT title FROM apollo_rating WHERE artist=%s", (artist,))
+    songs = sth.fetchall()
+    
+    if not songs:
+        print(f"No songs found for artist: {artist}")
+        return
+    
+    total_rating = 0
+    song_count = 0
+    song_details = []
+    
+    for song in songs:
+        title = song['title']
+        
+        # votes
+        good_votes = 0
+        bad_votes = 0
+        
+        sth.execute("SELECT * FROM apollo_vote WHERE artist=%s AND title=%s", (artist, title))
+        votes = sth.fetchall()
+        
+        for vote in votes:
+            v = vote['rating']
+            if v == "good":
+                good_votes += 1
+            elif v == "bad":
+                bad_votes += 1
+        
+        # skips
+        skips = 0
+        sth.execute("SELECT COUNT(*) AS skip_count FROM apollo_skip WHERE artist=%s AND title=%s", (artist, title))
+        skip_result = sth.fetchone()
+        skips = skip_result['skip_count'] if skip_result and 'skip_count' in skip_result else 0
+        
+        # ratings
+        rating = 0
+        sth.execute("SELECT * FROM apollo_rating WHERE artist=%s AND title=%s ORDER BY modifiedon ASC", (artist, title))
+        ratings = sth.fetchall()
+        
+        if ratings:
+            for row in ratings:
+                rating = int(row['rating'])
+        
+        if rating == 0:
+            rating = 2.5
+        
+        calculated_rating = rating_formula(rating, good_votes, bad_votes, skips)
+        total_rating += calculated_rating
+        song_count += 1
+        
+        song_details.append({
+            "title": title,
+            "calculated_rating": calculated_rating,
+            "good_votes": good_votes,
+            "bad_votes": bad_votes,
+            "skips": skips,
+            "rating": rating
+        })
+    
+    if song_count > 0:
+        avg_rating = total_rating / song_count
+        
+        json_data = {
+            "artist": artist,
+            "song_count": song_count,
+            "average_rating": avg_rating,
+            "total_rating": total_rating,
+            "songs": song_details
+        }
+        
+        return json_data
+    else:
+        return None
+
+
 def get_calculated_rating(artist, title):
     """Called for each line during playlist creation to get the calculated rating."""
     global calculated_ratings

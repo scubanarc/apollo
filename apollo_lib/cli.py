@@ -31,24 +31,25 @@ def main():
     compare_parser.add_argument("-d", "--directory", required=True, help="Directory to compare")
     compare_parser.set_defaults(func=handle_compare)
 
-    # create a subparser for rating [(-ps, --printskips), (-pv, --printvotes), (-pr, --printratings), (-c, --calc)+(-a, --artist)+(-t, --title)]
+    # create a subparser for rating [(-ps, --printskips), (-pv, --printvotes), (-pr, --printratings), (-c, --calc)+(-a, --artist), (-ca, --calculate-all), (-caa, --calculate-all-artists)]
     rating_parser = subparsers.add_parser("rating", help="Manage ratings")
     rating_group = rating_parser.add_mutually_exclusive_group(required=True)
     rating_group.add_argument("-ps", "--printskips", action="store_true", help="Print all skips")
     rating_group.add_argument("-pv", "--printvotes", action="store_true", help="Print all votes")
     rating_group.add_argument("-pr", "--printratings", action="store_true", help="Print all ratings")
     rating_group.add_argument("-ca", "--calculate-all", action="store_true", help="Calculate ratings for all songs")
-    rating_group.add_argument("-c", "--calc", action="store_true", help="Calculate rating for a song")
+    rating_group.add_argument("-caa", "--calculate-all-artists", action="store_true", help="Calculate and display all artists by rating (highest to lowest)")
+    rating_group.add_argument("-c", "--calc", action="store_true", help="Calculate rating for a song or artist")
     rating_parser.add_argument("-a", "--artist", type=str, help="Artist name for calculation")
-    rating_parser.add_argument("-t", "--title", type=str, help="Title of the song for calculation")
+    rating_parser.add_argument("-t", "--title", type=str, help="Title of the song for calculation (optional with -c)")
     rating_parser.add_argument("-v", "--verbose", action="store_true", help="Print verbose output")
     rating_parser.set_defaults(func=handle_rating)
     
     args = parser.parse_args()
     
     if args.command == "rating" and args.calc:
-        if not args.artist or not args.title:
-            parser.error("rating -c requires -a/--artist and -t/--title")
+        if not args.artist:
+            parser.error("rating -c requires -a/--artist")
     
     args.func(args)
 
@@ -88,8 +89,75 @@ def handle_rating(args):
         ratings.print_ratings()
     elif args.calculate_all:
         ratings.calculate_all_ratings(verbose=args.verbose)
+    elif args.calculate_all_artists:
+        from colorama import Fore, Style
+        artists_data = ratings.calculate_all_artists_ratings()
+        
+        if not artists_data:
+            print("No artist data found.")
+            return
+            
+        print(Fore.CYAN + "Artists by rating (highest to lowest):")
+        print(Style.RESET_ALL)
+        
+        for artist_data in artists_data:
+            artist = artist_data['artist']
+            avg_rating = artist_data['average_rating']
+            song_count = artist_data['song_count']
+            
+            # Color code based on rating
+            if avg_rating >= 70:
+                color = Fore.GREEN
+            elif avg_rating >= 50:
+                color = Fore.YELLOW
+            else:
+                color = Fore.RED
+                
+            print(f"{color}{artist} ({song_count} songs) - Average Rating: {avg_rating:.1f}{Style.RESET_ALL}")
     elif args.calc and args.artist and args.title:
         ratings.calculate_rating(args.artist, args.title)
+    elif args.calc and args.artist and not args.title:
+        from colorama import Fore, Style
+        artist_data = ratings.calculate_artist_rating(args.artist)
+        
+        if not artist_data:
+            print(f"No rating data found for artist: {args.artist}")
+            return
+            
+        artist = artist_data['artist']
+        song_count = artist_data['song_count']
+        avg_rating = artist_data['average_rating']
+        total_rating = artist_data['total_rating']
+        songs = artist_data['songs']
+        
+        # Color code based on rating
+        if avg_rating >= 70:
+            color = Fore.GREEN
+        elif avg_rating >= 50:
+            color = Fore.YELLOW
+        else:
+            color = Fore.RED
+        
+        print(f"{color}{artist} - Average Rating: {avg_rating:.1f} ({song_count} songs){Style.RESET_ALL}")
+        print(f"{Fore.CYAN}Total Rating: {total_rating:.1f}{Style.RESET_ALL}")
+        print()
+        
+        # Print top 5 and bottom 5 songs
+        sorted_songs = sorted(songs, key=lambda x: x['calculated_rating'], reverse=True)
+        
+        print(f"{Fore.GREEN}Top 5 songs:{Style.RESET_ALL}")
+        for i, song in enumerate(sorted_songs[:5]):
+            title = song['title']
+            rating = song['calculated_rating']
+            print(f"  {i+1}. {title} - {rating}")
+        
+        if len(sorted_songs) > 5:
+            print()
+            print(f"{Fore.RED}Bottom 5 songs:{Style.RESET_ALL}")
+            for i, song in enumerate(sorted_songs[-5:]):
+                title = song['title']
+                rating = song['calculated_rating']
+                print(f"  {len(sorted_songs)-4+i}. {title} - {rating}")
     else:
         print("Invalid rating command. Use -h for help.")
 
