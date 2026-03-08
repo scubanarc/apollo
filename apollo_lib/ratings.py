@@ -186,6 +186,84 @@ def calculate_all_ratings(verbose=False):
     global calculated_ratings
     calculated_ratings = merged
 
+
+def store_calculated_ratings(verbose=False):
+    """Create/update apollo_calculated_rating table with upserted calculated ratings."""
+    global calculated_ratings
+
+    if calculated_ratings is None:
+        calculate_all_ratings(verbose=False)
+
+    if not calculated_ratings:
+        print("No calculated ratings available to store.")
+        return
+
+    dbh, sth = get_db_connection()
+    if not dbh or not sth:
+        return
+
+    sth.execute(
+        """
+        CREATE TABLE IF NOT EXISTS apollo_calculated_rating (
+            artist VARCHAR(255) NOT NULL,
+            title VARCHAR(255) NOT NULL,
+            calculated_rating INT NOT NULL,
+            rating DECIMAL(4,2) NOT NULL DEFAULT 2.50,
+            good_votes INT NOT NULL DEFAULT 0,
+            bad_votes INT NOT NULL DEFAULT 0,
+            skips INT NOT NULL DEFAULT 0,
+            modifiedon TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (artist, title)
+        )
+        """
+    )
+
+    upsert_sql = """
+        INSERT INTO apollo_calculated_rating
+            (artist, title, calculated_rating, rating, good_votes, bad_votes, skips)
+        VALUES
+            (%s, %s, %s, %s, %s, %s, %s)
+        ON DUPLICATE KEY UPDATE
+            calculated_rating = VALUES(calculated_rating),
+            rating = VALUES(rating),
+            good_votes = VALUES(good_votes),
+            bad_votes = VALUES(bad_votes),
+            skips = VALUES(skips),
+            modifiedon = CURRENT_TIMESTAMP
+    """
+
+    upsert_count = 0
+    for data in calculated_ratings.values():
+        artist = data.get("artist")
+        title = data.get("title")
+        if not artist or not title:
+            continue
+
+        rating_val = data.get("rating")
+        try:
+            normalized_rating = float(rating_val) if rating_val is not None else 2.5
+        except (TypeError, ValueError):
+            normalized_rating = 2.5
+
+        sth.execute(
+            upsert_sql,
+            (
+                artist,
+                title,
+                int(data.get("calculated_rating", 50)),
+                normalized_rating,
+                int(data.get("good_votes", 0)),
+                int(data.get("bad_votes", 0)),
+                int(data.get("skips", 0)),
+            ),
+        )
+        upsert_count += 1
+
+    dbh.commit()
+
+    if verbose:
+        print(f"Stored {upsert_count} rows in apollo_calculated_rating")
+
 def calculate_all_artists_ratings():
     """
     Calculate and return all artists with their ratings, sorted from highest to lowest.

@@ -1,5 +1,5 @@
 import argparse
-from apollo_lib import playlist, scanner, ratings, compare
+from apollo_lib import playlist, scanner, ratings, compare, navidrome
 
 def main():
     """CLI entrypoint for Apollo playlist and library management."""
@@ -40,9 +40,11 @@ def main():
     rating_group.add_argument("-ca", "--calculate-all", action="store_true", help="Calculate ratings for all songs")
     rating_group.add_argument("-caa", "--calculate-all-artists", action="store_true", help="Calculate and display all artists by rating (highest to lowest)")
     rating_group.add_argument("-c", "--calc", action="store_true", help="Calculate rating for a song or artist")
+    rating_group.add_argument("-sn", "--sync-navidrome", action="store_true", help="Sync apollo_calculated_rating scores to Navidrome")
     rating_parser.add_argument("-a", "--artist", type=str, help="Artist name for calculation")
     rating_parser.add_argument("-t", "--title", type=str, help="Title of the song for calculation (optional with -c)")
     rating_parser.add_argument("-v", "--verbose", action="store_true", help="Print verbose output")
+    rating_parser.add_argument("-u", "--update-db", action="store_true", help="Upsert calculated ratings into apollo_calculated_rating")
     rating_parser.set_defaults(func=handle_rating)
     
     args = parser.parse_args()
@@ -79,31 +81,55 @@ def handle_compare(args):
 
 def handle_rating(args):
     """Handle 'rating' command operations."""
-    if args.printskips:
-        ratings.print_skips()
-    elif args.printvotes:
-        ratings.print_votes()
-    elif args.printratings:
-        ratings.print_ratings()
-    elif args.printratings:
-        ratings.print_ratings()
-    elif args.calculate_all:
-        ratings.calculate_all_ratings(verbose=args.verbose)
-    elif args.calculate_all_artists:
-        from colorama import Fore, Style
-        artists_data = ratings.calculate_all_artists_ratings()
-        
-        if not artists_data:
-            print("No artist data found.")
-            return
+    try:
+        if args.printskips:
+            ratings.print_skips()
+        elif args.printvotes:
+            ratings.print_votes()
+        elif args.printratings:
+            ratings.print_ratings()
+        elif args.calculate_all:
+            ratings.calculate_all_ratings(verbose=args.verbose)
+        elif args.calculate_all_artists:
+            from colorama import Fore, Style
+            artists_data = ratings.calculate_all_artists_ratings()
             
-        print(Fore.CYAN + "Artists by rating (highest to lowest):")
-        print(Style.RESET_ALL)
-        
-        for artist_data in artists_data:
+            if not artists_data:
+                print("No artist data found.")
+                return
+                
+            print(Fore.CYAN + "Artists by rating (highest to lowest):")
+            print(Style.RESET_ALL)
+            
+            for artist_data in artists_data:
+                artist = artist_data['artist']
+                avg_rating = artist_data['average_rating']
+                song_count = artist_data['song_count']
+                
+                # Color code based on rating
+                if avg_rating >= 70:
+                    color = Fore.GREEN
+                elif avg_rating >= 50:
+                    color = Fore.YELLOW
+                else:
+                    color = Fore.RED
+                    
+                print(f"{color}{artist} ({song_count} songs) - Average Rating: {avg_rating:.1f}{Style.RESET_ALL}")
+        elif args.calc and args.artist and args.title:
+            ratings.calculate_rating(args.artist, args.title)
+        elif args.calc and args.artist and not args.title:
+            from colorama import Fore, Style
+            artist_data = ratings.calculate_artist_rating(args.artist)
+            
+            if not artist_data:
+                print(f"No rating data found for artist: {args.artist}")
+                return
+                
             artist = artist_data['artist']
-            avg_rating = artist_data['average_rating']
             song_count = artist_data['song_count']
+            avg_rating = artist_data['average_rating']
+            total_rating = artist_data['total_rating']
+            songs = artist_data['songs']
             
             # Color code based on rating
             if avg_rating >= 70:
@@ -112,54 +138,47 @@ def handle_rating(args):
                 color = Fore.YELLOW
             else:
                 color = Fore.RED
-                
-            print(f"{color}{artist} ({song_count} songs) - Average Rating: {avg_rating:.1f}{Style.RESET_ALL}")
-    elif args.calc and args.artist and args.title:
-        ratings.calculate_rating(args.artist, args.title)
-    elif args.calc and args.artist and not args.title:
-        from colorama import Fore, Style
-        artist_data = ratings.calculate_artist_rating(args.artist)
-        
-        if not artist_data:
-            print(f"No rating data found for artist: {args.artist}")
-            return
             
-        artist = artist_data['artist']
-        song_count = artist_data['song_count']
-        avg_rating = artist_data['average_rating']
-        total_rating = artist_data['total_rating']
-        songs = artist_data['songs']
-        
-        # Color code based on rating
-        if avg_rating >= 70:
-            color = Fore.GREEN
-        elif avg_rating >= 50:
-            color = Fore.YELLOW
-        else:
-            color = Fore.RED
-        
-        print(f"{color}{artist} - Average Rating: {avg_rating:.1f} ({song_count} songs){Style.RESET_ALL}")
-        print(f"{Fore.CYAN}Total Rating: {total_rating:.1f}{Style.RESET_ALL}")
-        print()
-        
-        # Print top 5 and bottom 5 songs
-        sorted_songs = sorted(songs, key=lambda x: x['calculated_rating'], reverse=True)
-        
-        print(f"{Fore.GREEN}Top 5 songs:{Style.RESET_ALL}")
-        for i, song in enumerate(sorted_songs[:5]):
-            title = song['title']
-            rating = song['calculated_rating']
-            print(f"  {i+1}. {title} - {rating}")
-        
-        if len(sorted_songs) > 5:
+            print(f"{color}{artist} - Average Rating: {avg_rating:.1f} ({song_count} songs){Style.RESET_ALL}")
+            print(f"{Fore.CYAN}Total Rating: {total_rating:.1f}{Style.RESET_ALL}")
             print()
-            print(f"{Fore.RED}Bottom 5 songs:{Style.RESET_ALL}")
-            for i, song in enumerate(sorted_songs[-5:]):
+            
+            # Print top 5 and bottom 5 songs
+            sorted_songs = sorted(songs, key=lambda x: x['calculated_rating'], reverse=True)
+            
+            print(f"{Fore.GREEN}Top 5 songs:{Style.RESET_ALL}")
+            for i, song in enumerate(sorted_songs[:5]):
                 title = song['title']
                 rating = song['calculated_rating']
-                print(f"  {len(sorted_songs)-4+i}. {title} - {rating}")
-    else:
-        print("Invalid rating command. Use -h for help.")
+                print(f"  {i+1}. {title} - {rating}")
+            
+            if len(sorted_songs) > 5:
+                print()
+                print(f"{Fore.RED}Bottom 5 songs:{Style.RESET_ALL}")
+                for i, song in enumerate(sorted_songs[-5:]):
+                    title = song['title']
+                    rating = song['calculated_rating']
+                    print(f"  {len(sorted_songs)-4+i}. {title} - {rating}")
+        elif args.sync_navidrome:
+            try:
+                result = navidrome.update_all_ratings(verbose=args.verbose)
+                print(
+                    f"Navidrome sync complete. "
+                    f"Total: {result.get('total', 0)}, "
+                    f"Updated: {result.get('updated', 0)}, "
+                    f"Unchanged: {result.get('unchanged', 0)}, "
+                    f"Missing file: {result.get('missing_file', 0)}, "
+                    f"Failed: {result.get('failed', 0)}"
+                )
+                if result.get("fail_log"):
+                    print(f"Failure log: {result.get('fail_log')}")
+            except Exception as exc:
+                print(f"Navidrome sync failed: {exc}")
+        else:
+            print("Invalid rating command. Use -h for help.")
+    finally:
+        if args.update_db:
+            ratings.store_calculated_ratings(verbose=args.verbose)
 
 
 if __name__ == "__main__":

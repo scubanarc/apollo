@@ -268,7 +268,7 @@ def get_all_by_path(es, index_name, path):
                 ],
             },
         },
-        "size": 500,
+        "size": 2000,
     }
 
     result = es.search(index=index_name, body=query_body)

@@ -150,6 +150,10 @@ Copy `priority.yml` to `~/.config/apollo/priority.yml` and customize it to your 
 ```PLAYLIST_SOURCE_FOLDER - Flat text files in 'artist - title' format
 PLAYLIST_PUBLISHED_FOLDER - Where dynamically created M3U playlists are stored
 DYNAMIC_PLAYLIST_FILE - The file where AI generated playlists are stored - considered temporary
+MUSIC_FOLDER - Root folder of your music library used for scanning and path mapping
+NAVIDROME_URL - Base URL to your Navidrome server (example: http://localhost:4533)
+NAVIDROME_UN - Navidrome username
+NAVIDROME_PWD - Navidrome password
 ```
 
 ### Indexing Your Music Files
@@ -197,6 +201,21 @@ AI playlists ask your AI agent to generate a list of songs that match your reque
 **Artist** playlists and **any** playlists do not use the AI, but instead use ElasticSearch to match your request. Artist matches only artist, while any matches any meta data associated with the song, such as title, album, or genre.
 
 Finally, there is a `DYNAMIC_PLAYLIST_FILE` in your settings. This file is used to store AI generated playlists on the fly, so that mpd can pick them up right away.
+
+### Sync Calculated Ratings to Navidrome
+
+After refreshing calculated ratings, you can push them into Navidrome's per-song rating using filename mapping:
+
+```bash
+apollo.py rating -ca -u
+apollo.py rating -sn
+```
+
+Use verbose mode for per-track sync details:
+
+```bash
+apollo.py rating -sn -v
+```
 
 ## Typical Workflow
 

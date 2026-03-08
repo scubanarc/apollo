@@ -1,5 +1,9 @@
 MUSIC_FOLDER: "/path/to/music"
 
+NAVIDROME_URL: "http://localhost:4533"
+NAVIDROME_UN: "your-navidrome-username"
+NAVIDROME_PWD: "your-navidrome-password"
+
 PLAYLIST_SOURCE_FOLDER: "/path/to/source/playlists"
 PLAYLIST_PUBLISHED_FOLDER: "/path/to/mpd/playlists"
 DYNAMIC_PLAYLIST_FILE: "dynamic"
