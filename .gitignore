@@ -8,3 +8,4 @@ QWEN.md
 CLAUDE.md
 *.egg-info
 build/
+settings.yml

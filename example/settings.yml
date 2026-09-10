@@ -9,6 +9,15 @@ PLAYLIST_PUBLISHED_FOLDER: "/path/to/mpd/playlists"
 DYNAMIC_PLAYLIST_FILE: "dynamic"
 DEFAULT_PLAYLIST_FILE: "random"
 
+AI_PROVIDER: "openai"
+
+# Used when AI_PROVIDER is "codex".
+CODEX_BIN: "/home/jason/.local/bin/codex"
+CODEX_HOME: "/home/jason/.config/apollo/codex-home"
+CODEX_WORKDIR: "/src/apollo"
+CODEX_REASONING_EFFORT: "none"
+CODEX_TIMEOUT_SECONDS: 120
+
 OPENAI_API_KEY: "your-key"
 OPENAI_BASE_URL: "https://openrouter.ai/api/v1"
 OPENAI_MODEL: "your-favorite-model"
