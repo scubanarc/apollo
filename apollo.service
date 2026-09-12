@@ -1,0 +1,22 @@
+[Unit]
+Description=Apollo
+Wants=network-online.target
+After=network-online.target
+RequiresMountsFor=/mnt/fast/apollo
+
+[Service]
+Type=simple
+User=jason
+Group=jason
+WorkingDirectory=/src/apollo
+ExecStart=/src/apollo/.venv/bin/apollo serve --host 0.0.0.0 --port 5002
+EnvironmentFile=/mnt/fast/apollo/apollo.env
+Environment=APOLLO_CONFIG=/mnt/fast/apollo/settings.yml
+Environment=HOME=/home/jason
+Environment=TERM=dumb
+RestartSec=1s
+Restart=always
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target

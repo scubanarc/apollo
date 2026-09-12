@@ -1,0 +1,11 @@
+{% extends 'base.html' %}{% from 'macros.html' import jobs_table with context %}
+{% block title %}Overview{% endblock %}
+{% block content %}
+<section class="hero"><div class="hero-copy"><p class="eyebrow">YOUR LIBRARY · REIMAGINED</p><h1>Find your<br><em>next frequency.</em></h1><p>Turn a mood, an artist, or a late-night idea into a playlist from the music you already own.</p><a class="button" href="{{ url_for('pages.playlists') }}">Create a playlist <span>↗</span></a></div><div class="horizon" aria-hidden="true"><div class="sun"></div><div class="grid"></div><span class="frequency">33⅓ / STEREO</span></div></section>
+<div class="section-heading"><h2>On the controls</h2><span class="eyebrow">01 / EXPLORE</span></div>
+<div class="cards three"><a class="card action-card" href="{{ url_for('pages.playlists') }}"><span class="icon">♫</span><h3>Build a mix</h3><p>Discover tracks, preview your selection, and publish to your player.</p><span class="card-link">Playlists →</span></a><a class="card action-card" href="{{ url_for('pages.library') }}"><span class="icon pink">≋</span><h3>Tune your library</h3><p>Index your collection or find better versions of your favorite songs.</p><span class="card-link">Library →</span></a><a class="card action-card" href="{{ url_for('pages.ratings') }}"><span class="icon amber">☆</span><h3>Shape the rotation</h3><p>Explore ratings, votes, and skips. Send your scores to Navidrome.</p><span class="card-link">Ratings →</span></a></div>
+<div class="section-heading"><h2>System signals</h2><span class="badge {{ 'succeeded' if worker else 'queued' }}">Worker {{ 'online' if worker else 'offline' }}</span></div>
+<section class="card signals">{% for check in status.checks %}<div><span class="signal {{ 'on' if check.ok else 'off' }}"></span><div><strong>{{ check.name.replace('_',' ').title() }}</strong><small>{{ check.detail }}</small></div></div>{% endfor %}</section>
+{% if not worker %}<p class="notice">Background work will wait until the worker starts. Run <code>apollo worker</code>, or start this server with <code>apollo serve</code>.</p>{% endif %}
+<div class="section-heading"><h2>Recent activity</h2><a href="{{ url_for('pages.activity') }}">All activity →</a></div><section class="card flush">{{ jobs_table(recent) }}</section>
+{% endblock %}

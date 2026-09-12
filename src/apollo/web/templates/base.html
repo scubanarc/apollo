@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="csrf-token" content="{{ csrf_token() }}">
+<title>{% block title %}Apollo{% endblock %} · Music control</title>
+<link rel="icon" type="image/png" sizes="64x64" href="{{ url_for('static', filename='favicon.png') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='apollo.css') }}">
+<script defer src="{{ url_for('static', filename='apollo.js') }}"></script>
+</head>
+<body>
+<header class="topbar"><a class="brand" href="{{ url_for('pages.dashboard') }}"><span class="brand-mark" aria-hidden="true">Λ</span> APOLLO <small>MUSIC CONTROL</small></a>
+<nav aria-label="Main navigation">{% for endpoint,label in [('dashboard','Overview'),('playlists','Playlists'),('library','Library'),('ratings','Ratings'),('activity','Activity')] %}<a {% if request.endpoint == 'pages.'+endpoint %}aria-current="page"{% endif %} href="{{ url_for('pages.'+endpoint) }}">{{ label }}</a>{% endfor %}</nav>
+{% if session.get('authenticated') %}<form action="{{ url_for('logout') }}" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="quiet">Log out</button></form>{% endif %}</header>
+<main id="main">{% block content %}{% endblock %}</main>
+<dialog id="activity-viewer" aria-labelledby="activity-viewer-title">
+<div class="activity-viewer-head"><h2 id="activity-viewer-title">Activity</h2><button type="button" class="quiet activity-viewer-close" aria-label="Close activity viewer">Close ×</button></div>
+<div id="activity-viewer-content"></div>
+</dialog>
+<dialog id="song-viewer" aria-labelledby="song-viewer-title">
+<div class="activity-viewer-head"><h2 id="song-viewer-title">Song details</h2><button type="button" class="quiet" id="song-viewer-close" aria-label="Close song details">Close ×</button></div>
+<div id="song-viewer-content" aria-live="polite"></div>
+</dialog>
+<template id="inline-player-template">
+<span class="inline-player" role="group" aria-label="Browser playback">
+<button type="button" class="quiet" data-stream-toggle>Pause</button>
+<button type="button" class="quiet" data-stream-stop>Stop</button>
+<output data-stream-time aria-label="Playback time">0:00 / 0:00</output>
+<input data-stream-seek type="range" aria-label="Playback position" min="0" max="0" value="0" step="0.1" disabled>
+<span data-stream-status class="muted" role="status"></span>
+</span>
+</template>
+<footer><span>APOLLO <span class="muted">/ Your collection. Your frequency.</span></span><a href="{{ url_for('pages.api_docs') }}">API reference ↗</a></footer>
+</body></html>

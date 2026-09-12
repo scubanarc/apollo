@@ -1,0 +1,3 @@
+{% extends 'base.html' %}{% from 'macros.html' import page,jobs_table,pager with context %}{% block title %}Activity{% endblock %}{% block content %}
+{{ page('04 / ACTIVITY','In the pipeline.','Follow your playlists, scans, calculations, and syncs.') }}
+{% if not worker %}<p class="notice">Worker offline. Queued jobs will run when <code>apollo worker</code> starts.</p>{% endif %}<section class="card flush">{{ jobs_table(result['items']) }}</section>{{ pager(result,'pages.activity') }}{% endblock %}

@@ -9,3 +9,7 @@ CLAUDE.md
 *.egg-info
 build/
 settings.yml
+
+dist/
+.pytest_cache/
+.ruff_cache/

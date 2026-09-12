@@ -4,17 +4,30 @@ NAVIDROME_URL: "http://localhost:4533"
 NAVIDROME_UN: "your-navidrome-username"
 NAVIDROME_PWD: "your-navidrome-password"
 
-PLAYLIST_SOURCE_FOLDER: "/path/to/source/playlists"
+PLAYLIST_SOURCE_FOLDER: "/mnt/fast/apollo/playlists"
+# Optional existing working directory; defaults to PLAYLIST_SOURCE_FOLDER/.apollo.
+# Set this when moving sources without moving generated M3Us and the scan cache.
+# PLAYLIST_WORK_FOLDER: "/path/to/working/files"
 PLAYLIST_PUBLISHED_FOLDER: "/path/to/mpd/playlists"
 DYNAMIC_PLAYLIST_FILE: "dynamic"
 DEFAULT_PLAYLIST_FILE: "random"
 
+# Direct MPD connection used by per-song Play links.
+MPD_HOST: "mpd-server"
+MPD_PORT: 6600
+
+# Used to tell Node-RED to load and play dynamic.m3u.
+MQTT_SERVER: "mqtt-server"
+MQTT_PORT: 1883
+MQTT_UN: "mqtt-username"
+MQTT_PWD: "mqtt-password"
+
 AI_PROVIDER: "openai"
 
 # Used when AI_PROVIDER is "codex".
-CODEX_BIN: "/home/jason/.local/bin/codex"
-CODEX_HOME: "/home/jason/.config/apollo/codex-home"
-CODEX_WORKDIR: "/src/apollo"
+CODEX_BIN: "codex"
+# CODEX_HOME: "/path/to/authenticated/codex-home"
+# CODEX_WORKDIR: "/path/to/apollo"
 CODEX_REASONING_EFFORT: "none"
 CODEX_TIMEOUT_SECONDS: 120
 
@@ -43,3 +56,11 @@ BITRATE_MULTIPLIERS:
   ".aac": 1.2
   ".mp4": 1.2
   ".flac": 1.0
+
+# Local job queue and browser session secret (defaults to ~/.local/state/apollo).
+# Use a local filesystem and a different STATE_DIR for each configuration.
+# STATE_DIR: "/home/your-user/.local/state/apollo"
+
+# Optional shared browser/API access token. APOLLO_API_TOKEN overrides this.
+# Configure before serving beyond localhost; use an HTTPS reverse proxy.
+# API_TOKEN: "generate-a-long-random-token"

@@ -1,0 +1,16 @@
+{% extends 'base.html' %}{% from 'macros.html' import page,csrf,pager with context %}
+{% block title %}Playlists{% endblock %}{% block content %}
+{{ page('01 / PLAYLISTS', 'Make your next mix.', 'Build a selection from your collection, then publish it to your music player.') }}
+{% if error %}<p class="notice">{{ error }}</p>{% endif %}
+<div class="columns"><section class="card"><h2>Create a playlist</h2><form method="post" action="{{ url_for('pages.submit', action='playlist.preview') }}">{{ csrf() }}
+<label>Find tracks by<select name="type"><option value="ai">AI prompt</option><option value="artist">Artist</option><option value="path">Library path</option><option value="any" selected>Metadata regex</option></select></label>
+<label>Your inspiration<textarea name="input" rows="4" required></textarea></label>
+<label>Playlist name<input name="name"><small>Leave blank to use your configured dynamic playlist.</small></label>
+<div class="form-actions"><button>Preview tracks →</button><button class="secondary" formaction="{{ url_for('pages.submit', action='playlist.create') }}">Create now</button></div>
+<button class="quiet" name="dynamic" value="on" formaction="{{ url_for('pages.submit', action='playlist.create') }}">Replace and publish dynamic playlist</button>
+<p class="muted small">Preview lets you review tracks before saving. Dynamic replaces the configured dynamic playlist and publishes it immediately.</p></form></section>
+<section class="card"><div class="section-heading compact"><h2>Your playlists</h2><span class="badge">{{ result.total }}</span></div>
+<ul class="playlist-list">{% for row in result['items'] %}<li><a href="{{ url_for('pages.playlist_detail',name=row.name) }}"><span class="mini-disc" aria-hidden="true">◉</span>{{ row.name }}</a><div class="playlist-actions"><form method="post" action="{{ url_for('pages.submit', action='playlist.publish') }}">{{ csrf() }}<input type="hidden" name="name" value="{{ row.name }}"><button class="quiet">Publish ↗</button></form><form method="post" action="{{ url_for('pages.submit', action='playlist.play') }}">{{ csrf() }}<input type="hidden" name="name" value="{{ row.name }}"><button class="quiet">Play now</button></form></div></li>{% else %}<li class="empty">Your first mix starts here.</li>{% endfor %}</ul>
+{{ pager(result,'pages.playlists') }}
+<form method="post" action="{{ url_for('pages.submit', action='playlist.publish') }}">{{ csrf() }}<input type="hidden" name="all" value="on"><button class="secondary">Publish all playlists</button></form></section></div>
+{% endblock %}

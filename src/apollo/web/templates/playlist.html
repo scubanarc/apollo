@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% from 'macros.html' import page,csrf,song_play with context %}
+{% block title %}{{ result.name }}{% endblock %}
+{% block content %}
+{{ page('PLAYLIST',result.name,'Edit the source text. Order, comments, and spacing are preserved.') }}
+<button type="button" class="secondary compact" id="playlist-view-toggle" aria-controls="playlist-editor playlist-playable" aria-pressed="true">Editable Text</button>
+{% for message in get_flashed_messages() %}<p class="notice" role="status">{{ message }}</p>{% endfor %}
+<section class="card">
+  <form id="playlist-editor" hidden method="post" action="{{ url_for('pages.playlist_edit',name=result.name) }}">
+    {{ csrf() }}
+    <label for="playlist-content">{{ result.name }}.txt</label>
+    <textarea id="playlist-content" name="content" rows="24" spellcheck="false" wrap="off">{{ '\n' }}{{ result.content }}</textarea>
+    <div class="form-actions"><button type="submit">Save</button>
+      <button type="button" class="secondary" id="playlist-stats" data-name="{{ result.name }}" data-url="{{ url_for('api.submit') }}">Stats</button>
+    </div>
+  </form>
+  <section id="playlist-playable" aria-labelledby="playlist-playable-heading">
+    <h2 id="playlist-playable-heading">{{ result.name }}.txt</h2>
+    <ol class="tracks playable-tracks" id="playlist-playable-tracks">
+      {% for track in result.tracks %}<li>{{ song_play(track) }}</li>{% else %}<li class="empty">No playable song lines found.</li>{% endfor %}
+    </ol>
+  </section>
+  <section id="playlist-stats-results" class="section" hidden aria-labelledby="stats-heading">
+    <h2 id="stats-heading">Playlist stats</h2>
+    <p class="muted">Based on the editor text when you click Stats, including unsaved edits. No changes are saved.</p>
+    <p id="playlist-stats-status" role="status"></p>
+    <div id="playlist-stats-details"></div>
+  </section>
+  <form method="post" action="{{ url_for('pages.submit',action='playlist.publish') }}">
+    {{ csrf() }}<input type="hidden" name="name" value="{{ result.name }}">
+    <button class="secondary">Publish playlist ↗</button>
+  </form>
+  <form method="post" action="{{ url_for('pages.submit',action='playlist.play') }}">
+    {{ csrf() }}<input type="hidden" name="name" value="{{ result.name }}">
+    <button class="quiet">Play now</button>
+  </form>
+</section>
+{% endblock %}

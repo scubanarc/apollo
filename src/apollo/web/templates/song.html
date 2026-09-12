@@ -1,0 +1,17 @@
+{% extends 'base.html' %}{% from 'macros.html' import csrf with context %}
+{% block title %}{{ result.song }}{% endblock %}
+{% block content %}
+<h1>{{ result.song }}</h1>
+<p>{{ result.total }} Elasticsearch entries matching this song. Search can include similar titles or artists; each entry shows its indexed metadata.</p>
+<p>Current selection considers the first 10 search results: highest relevance score, then FLAC, then bitrate (normalized for other formats), then pattern priority. Exact ties use the first result.</p>
+<section class="card"><h2>Rating summary</h2>
+{% if result.rating_warning %}<p class="notice">{{ result.rating_warning }}</p>{% else %}
+<dl class="result-list">{% for label,key in [('User rating (out of 5; default 2.5)','rating'),('Good votes','good_votes'),('Bad votes','bad_votes'),('Skips','skips'),('Calculated rating','calculated_rating')] %}<dt>{{ label }}</dt><dd>{{ result.rating[key] if result.rating[key] is not none else 'Unrated (default 2.5)' }}</dd>{% endfor %}<dt>Playlist threshold</dt><dd>{{ result.threshold }}</dd></dl>
+<p>{{ 'Excluded from generated playlists by the rating threshold.' if result.excluded else 'Passes the playlist rating threshold.' }} Direct playback bypasses the rating filter.</p>{% endif %}</section>
+{% for entry in result.entries %}<section class="card song-entry {{ 'winner' if entry.winner else '' }}">
+<div class="section-heading"><h2>{{ 'Winner · ' if entry.winner else '' }}{{ entry.source.get('artist','') }} - {{ entry.source.get('title','') }}</h2><div class="file-actions"><a class="quiet stream-link" href="{{ url_for('pages.stream', entry_id=entry.id) }}" data-stream-title="{{ entry.source.get('artist','') }} - {{ entry.source.get('title','') }}" aria-label="Stream entry {{ loop.index }}" title="Play in browser">▶</a><form method="post" action="{{ url_for('pages.submit',action='entry.play') }}">{{ csrf() }}<input type="hidden" name="entry_id" value="{{ entry.id }}"><button class="quiet entry-play" aria-label="Play MPD entry {{ loop.index }}">Play MPD</button></form></div></div>
+<p>{{ entry.reason }}</p>
+<dl class="result-list"><dt>Search score</dt><dd>{{ entry.score }}</dd><dt>Effective bitrate</dt><dd>{{ (entry.effective_bitrate / 1000)|round(1) }} kbps</dd><dt>Pattern priority</dt><dd>{{ entry.priority }}</dd><dt>Matched patterns</dt><dd>{{ entry.patterns|join(', ') or 'None' }}</dd><dt>Elasticsearch ID</dt><dd>{{ entry.id }}</dd>
+{% for key,value in entry.source.items() %}<dt>{{ key.replace('_',' ').title() }}</dt><dd>{{ value }}</dd>{% endfor %}</dl>
+</section>{% else %}<p class="empty">No matching files found in Elasticsearch.</p>{% endfor %}
+{% endblock %}

@@ -10,16 +10,19 @@ Apollo is designed to work with existing music collections, Elasticsearch, MySQL
 
 ## Repository Layout
 
-- `apollo.py` - main entry point
-- `apollo_lib/cli.py` - CLI subcommands and argument parsing
-- `apollo_lib/settings.py` - config loading from `~/.config/apollo/settings.yml`
-- `apollo_lib/scanner.py` - scans music folders and indexes metadata into Elasticsearch
-- `apollo_lib/playlist.py` - creates playlists, writes `.m3u`, handles source lists
-- `apollo_lib/estools.py` - Elasticsearch lookup and file selection logic
-- `apollo_lib/ratings.py` - song ratings, skips, votes, calculated ratings, MySQL storage
-- `apollo_lib/navidrome.py` - Navidrome/Subsonic rating sync
-- `apollo_lib/aitools.py` - OpenRouter/OpenAI-compatible AI playlist generation
-- `apollo_lib/compare.py` - compares a directory against the index to find better versions
+- `src/apollo/__main__.py` - module entry point
+- `src/apollo/cli.py` - Typer CLI commands
+- `src/apollo/services.py` - shared validated operations
+- `src/apollo/web/` - Flask factory, HTML pages and versioned API
+- `src/apollo/jobs.py` - persistent local job queue and worker
+- `src/apollo/settings.py` - config loading from `/mnt/fast/apollo/settings.yml`
+- `src/apollo/scanner.py` - scans music folders and indexes metadata into Elasticsearch
+- `src/apollo/playlist.py` - creates playlists, writes `.m3u`, handles source lists
+- `src/apollo/estools.py` - Elasticsearch lookup and file selection logic
+- `src/apollo/ratings.py` - song ratings, skips, votes, calculated ratings, MySQL storage
+- `src/apollo/navidrome.py` - Navidrome/Subsonic rating sync
+- `src/apollo/aitools.py` - OpenRouter/OpenAI-compatible AI playlist generation
+- `src/apollo/compare.py` - compares a directory against the index to find better versions
 - `example/settings.yml` - sample configuration
 - `README.md` - project overview and usage notes
 - `CLAUDE.md`, `QWEN.md` - other agent instructions / repo notes
@@ -40,7 +43,7 @@ Songs are referenced as `artist - title` pairs. Album is not the primary unit.
 When multiple files match a song, Apollo chooses based on:
 - FLAC preferred over non-FLAC
 - higher bitrate preferred
-- per-file priority patterns from `~/.config/apollo/priority.yml`
+- per-file priority patterns from `/mnt/fast/apollo/priority.yml`
 - normalized bitrate multipliers for non-FLAC formats
 
 ## Important External Dependencies
@@ -55,7 +58,7 @@ Apollo expects these services/configured systems:
 ## Configuration
 
 Primary config file:
-- `~/.config/apollo/settings.yml`
+- `/mnt/fast/apollo/settings.yml`
 
 Important settings seen in the codebase:
 - `MUSIC_FOLDER`
@@ -82,13 +85,13 @@ Important settings seen in the codebase:
 - `SKIP_STRENGTH`
 
 Apollo also expects:
-- `~/.config/apollo/priority.yml` for filename priority patterns
+- `/mnt/fast/apollo/priority.yml` for filename priority patterns
 
 ## Common Commands
 
 Run the CLI:
 ```bash
-python apollo.py [command]
+python -m apollo [command]
 ```
 
 Or, if installed as a console script:
@@ -99,18 +102,18 @@ apollo [command]
 Useful commands:
 ```bash
 apollo scan
-apollo create -t ai -i "classic rock songs from the 70s" -p "classic-rock-70s" -y
-apollo create -t artist -i "Spoon" -p "spoon-favorites" -y
-apollo create -t any -i "happy" -p "happy-songs" -y
+apollo create -t ai -i "classic rock songs from the 70s" -p "classic-rock-70s"
+apollo create -t artist -i "Spoon" -p "spoon-favorites"
+apollo create -t any -i "happy" -p "happy-songs"
 apollo publish -p playlist-name
-apollo publish -a
+apollo publish --all
 apollo compare -d /path/to/directory
-apollo rating -ps
-apollo rating -pv
-apollo rating -pr
-apollo rating -ca
-apollo rating -c -a "Artist" -t "Title"
-apollo rating -sn
+apollo rating list --kind skips
+apollo rating list --kind votes
+apollo rating list --kind ratings
+apollo rating calculate
+apollo rating calculate --artist "Artist" --title "Title"
+apollo rating sync
 ```
 
 ## Development Workflow
@@ -119,6 +122,13 @@ apollo rating -sn
 - The codebase is a Python package installed in editable mode.
 - Most behavior is controlled by config and external services rather than local state.
 - There are several `__pycache__` and build artifacts in the repo; avoid editing generated files.
+
+## Remote Restart
+
+- Apollo runs on the local server `sensors` and is available at `https://apollo.si8.org`.
+- The bearer credential for `POST /api/v1/restart` is stored as `APOLLO_API_TOKEN` in `/mnt/fast/apollo/apollo.env`.
+- Read the credential from that file at runtime. Never print, log, quote, or copy its value into commands, source files, responses, or durable memory.
+- Use the restart endpoint anytime you change the config or codebase. It will restart the Flask server.
 
 ## Behavioral Notes
 
@@ -147,7 +157,7 @@ apollo rating -sn
 
 - Don’t assume Apollo manages files; it only creates playlists.
 - Don’t edit generated artifacts like `__pycache__`, `build/`, or `.egg-info/`.
-- `settings.py` exits if a required config key is missing.
+- `settings.py` raises ConfigurationError when an operation needs a missing setting.
 - Elasticsearch and MySQL are required for most non-trivial workflows.
 - AI playlists depend on an OpenAI-compatible API key and model setting.
 - Navidrome sync expects a working Subsonic-compatible Navidrome server.
